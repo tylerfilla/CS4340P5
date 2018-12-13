@@ -4,29 +4,189 @@
  * December 13, 2018
  */
 
+#include <cmath>
+#include <functional>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <random>
 
 /**
- * A single 2D data point.
+ * A real-valued 2D vector.
  */
-struct Point
+struct Vec2
 {
+    /** The first dimension. */
     double x;
+
+    /** The second dimension. */
     double y;
+
+    /**
+     * Sum (vector-vector).
+     */
+    inline Vec2 operator+(const Vec2& rhs) const
+    { return {x + rhs.x, y + rhs.y}; }
+
+    inline Vec2& operator+=(const Vec2& rhs)
+    { return *this = *this + rhs; }
+
+    /**
+     * Difference (vector-vector).
+     */
+    inline Vec2 operator-(const Vec2& rhs) const
+    { return {x - rhs.x, y - rhs.y}; }
+
+    inline Vec2& operator-=(const Vec2& rhs)
+    { return *this = *this - rhs; }
+
+    /**
+     * Product (vector-scalar).
+     */
+    inline Vec2 operator*(double rhs) const
+    { return {x * rhs, y * rhs}; }
+
+    inline Vec2& operator*=(double rhs)
+    { return *this = *this * rhs; }
+
+    /**
+     * Product (dot, vector-vector).
+     */
+    inline double dot(const Vec2& rhs) const
+    { return x * rhs.x + y * rhs.y; }
+
+    /**
+     * Magnitude.
+     */
+    inline double mag() const
+    { return std::sqrt(dot(*this)); }
 };
 
 /**
- * Print a point to an output stream.
+ * Print a vector to an output stream.
  *
  * @param out The output stream
- * @param pt The point
+ * @param vec The vector
  * @return The output stream
  */
-static std::ostream& operator<<(std::ostream& out, const Point& pt)
+static std::ostream& operator<<(std::ostream& out, const Vec2& vec)
 {
-    return out << "(" << pt.x << ", " << pt.y << ")";
+    return out << "(" << vec.x << ", " << vec.y << ")";
+}
+
+/**
+ * An iterable range.
+ */
+template<class InputIt>
+struct range
+{
+    InputIt m_begin;
+    InputIt m_end;
+
+    range(InputIt p_begin, InputIt p_end)
+            : m_begin {p_begin}
+            , m_end {p_end}
+    {
+    }
+
+    InputIt begin()
+    { return m_begin; }
+
+    InputIt end()
+    { return m_end; }
+};
+
+/**
+ * Do linear regression over a set of points with optional L2-regularization.
+ *
+ * @param begin An iterator to the first point
+ * @param end An iterator one past the end of the last point
+ * @param lambda The regularization constraint (optional, defaults to zero)
+ */
+template<class InputIt>
+static void linreg(InputIt begin, InputIt end, double lambda = 0)
+{
+    // GD iteration limit
+    const int il = 1000000;
+
+    // GD learning rate
+    const double lr = 0.01;
+
+    // GD termination threshold (magnitude)
+    const double th = 0.001;
+
+    // The sample count
+    auto N = std::distance(begin, end);
+
+    std::cout << "Performing linear regression on " << N << " points\n";
+    std::cout << " * Optimizer: batch gradient descent\n";
+    std::cout << " * Iteration limit: " << il << "\n";
+    std::cout << " * Learning rate: " << lr << "\n";
+    std::cout << " * Target gradient magnitude: " << th << "\n";
+
+    // The weight vector
+    Vec2 weight {};
+
+    std::cout << "Initial weight vector: " << weight << "\n";
+
+    // Total number of iterations taken
+    int iters = 0;
+
+    // Gradient descent
+    for (int t = 0; t < il; ++t)
+    {
+        std::cout << "Iteration " << (iters = t + 1) << "\n";
+        std::cout << " -> Current weight vector: " << weight << "\n";
+
+        // The gradient vector
+        Vec2 grad {};
+
+        // Mean-squared error
+        double mse = 0;
+
+        // Go over all points
+        for (auto&& pt : range {begin, end})
+        {
+            // Make feature vector for point
+            Vec2 feature {1, pt.x};
+
+            // Update MSE as-is
+            mse += std::pow(pt.y - weight.dot(feature), 2);
+
+            // Update gradient vector
+            grad -= feature * (pt.y - weight.dot(feature));
+        }
+
+        // Finalize MSE
+        mse /= N;
+
+        std::cout << " -> Computed MSE: " << mse << "\n";
+
+        // Finalize MSE component of gradient vector
+        // We still need to do regularization with the penality term
+        grad *= (1.0 / N);
+
+        // Add in L2 penalty term
+        grad.x += 2 * lambda * weight.x + lambda * weight.y * weight.y;
+        grad.y += lambda * weight.x * weight.x + 2 * lambda * weight.y;
+
+        std::cout << " -> Computed gradient: " << grad << "\n";
+
+        // If gradient is under threshold magnitude, we're done
+        if (grad.dot(grad) <= th * th)
+        {
+            std::cout << " -> !!! STOP: GRADIENT MINIMIZED (mag. " << grad.mag() << " <= " << th << ")\n";
+            break;
+        }
+
+        // Update weight vector by gradient
+        weight -= grad * lr;
+
+        std::cout << " -> New weight vector: " << weight << "\n";
+    }
+
+    std::cout << "Concluding linear regression after " << iters << " iteration(s)\n";
+    std::cout << "Final weight vector: " << weight << "\n";
 }
 
 int main()
@@ -54,11 +214,11 @@ int main()
         auto x = gen();
         auto y = f(x);
 
-        return Point {x, y};
+        return Vec2 {x, y};
     };
 
-    // An algorithm to generate a test point
-    auto gen_test_point = [&]()
+    // An algorithm to generate a training point
+    auto gen_train_point = [&]()
     {
         // As prescribed, the point satisfies y = x^2 + 10
         return gen_point([](auto x)
@@ -67,38 +227,44 @@ int main()
         });
     };
 
-    // An algorithm to generate multiple test points
-    auto gen_multi_test_points = [&](int num)
+    // An algorithm to generate multiple training points
+    auto gen_multi_train_points = [&](int num)
     {
-        std::vector<Point> points(num);
+        std::vector<Vec2> points(num);
+
         for (int i = 0; i < num; ++i)
         {
-            points[i] = gen_test_point();
+            points[i] = gen_train_point();
         }
+
         return points;
     };
 
     // Generate twelve training points
-    auto training = gen_multi_test_points(12);
+    auto training = gen_multi_train_points(12);
 
     // Print out training set for reference
     std::cout << "TRAINING SET (n = " << training.size() << ")\n";
-    std::cout << "------------------------------\n";
+    std::cout << "--------------------------------------------------\n";
     for (int i = 0; i < training.size(); ++i)
     {
         std::cout << (i + 1) << ". " << training[i] << "\n";
     }
 
-    // Task 1
     std::cout << "\nTASK 1 - LINEAR REGRESSION\n";
-    // TODO
+    std::cout << "--------------------------------------------------\n";
+
+    // Simply do linear regression on entire training set
+    linreg(training.begin(), training.end());
 
     // Task 2
     std::cout << "\nTASK 2 - RIDGE REGRESSION WITH GIVEN LAMBDAS\n";
+    std::cout << "--------------------------------------------------\n";
     // TODO
 
     // Task 3
     std::cout << "\nTASK 3 - RIDGE REGRESSION WITH 3-FOLD CV\n";
+    std::cout << "--------------------------------------------------\n";
     // TODO
 
     return 0;
