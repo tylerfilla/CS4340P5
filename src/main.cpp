@@ -5,6 +5,7 @@
  */
 
 #include <cmath>
+#include <cstdlib>
 #include <functional>
 #include <iostream>
 #include <iterator>
@@ -104,7 +105,7 @@ struct range
  * @param lambda The regularization constraint (optional, defaults to zero)
  */
 template<class InputIt>
-static void linreg(InputIt begin, InputIt end, double lambda = 0)
+static Vec2 linreg(InputIt begin, InputIt end, double lambda = 0)
 {
     // GD iteration limit
     const int il = 1000000;
@@ -187,6 +188,8 @@ static void linreg(InputIt begin, InputIt end, double lambda = 0)
 
     std::cout << "Concluding linear regression after " << iters << " iteration(s)\n";
     std::cout << "Final weight vector: " << weight << "\n";
+
+    return weight;
 }
 
 int main()
@@ -251,20 +254,31 @@ int main()
         std::cout << (i + 1) << ". " << training[i] << "\n";
     }
 
+    std::system("pause");
+
     std::cout << "\nTASK 1 - LINEAR REGRESSION\n";
     std::cout << "--------------------------------------------------\n";
 
     // Simply do linear regression on entire training set
-    linreg(training.begin(), training.end());
+    {
+        auto w = linreg(training.begin(), training.end());
+        std::cout << "\nRegression line: y = " << w.y << " * x + " << w.x << "\n";
+    }
+
+    std::system("pause");
 
     // Task 2
     std::cout << "\nTASK 2 - RIDGE REGRESSION WITH GIVEN LAMBDAS\n";
     std::cout << "--------------------------------------------------\n";
+    std::cout << "TODO\n";
     // TODO
+
+    std::system("pause");
 
     // Task 3
     std::cout << "\nTASK 3 - RIDGE REGRESSION WITH 3-FOLD CV\n";
     std::cout << "--------------------------------------------------\n";
+    std::cout << "TODO\n";
     // TODO
 
     return 0;
