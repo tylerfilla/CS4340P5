@@ -31,6 +31,10 @@ static std::ostream& operator<<(std::ostream& out, const Point& pt)
 
 int main()
 {
+    std::cout << "Tyler Filla\n";
+    std::cout << "CS 4340 - Project 5\n";
+    std::cout << "December 13, 2018\n\n";
+
     // The smallest representable double
     auto epsilon = std::numeric_limits<double>::epsilon();
 
@@ -74,11 +78,28 @@ int main()
         return points;
     };
 
-    // FIXME
-    for (auto&& pt : gen_multi_test_points(5))
+    // Generate twelve training points
+    auto training = gen_multi_test_points(12);
+
+    // Print out training set for reference
+    std::cout << "TRAINING SET (n = " << training.size() << ")\n";
+    std::cout << "------------------------------\n";
+    for (int i = 0; i < training.size(); ++i)
     {
-        std::cout << pt << "\n";
+        std::cout << (i + 1) << ". " << training[i] << "\n";
     }
+
+    // Task 1
+    std::cout << "\nTASK 1 - LINEAR REGRESSION\n";
+    // TODO
+
+    // Task 2
+    std::cout << "\nTASK 2 - RIDGE REGRESSION WITH GIVEN LAMBDAS\n";
+    // TODO
+
+    // Task 3
+    std::cout << "\nTASK 3 - RIDGE REGRESSION WITH 3-FOLD CV\n";
+    // TODO
 
     return 0;
 }
