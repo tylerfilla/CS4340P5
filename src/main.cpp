@@ -4,9 +4,9 @@
  * December 13, 2018
  */
 
+#include <array>
 #include <cmath>
 #include <cstdlib>
-#include <functional>
 #include <iostream>
 #include <iterator>
 #include <limits>
@@ -111,7 +111,7 @@ static Vec2 linreg(InputIt begin, InputIt end, double lambda = 0)
     const int il = 1000000;
 
     // GD learning rate
-    const double lr = 0.01;
+    const double lr = 0.005;
 
     // GD termination threshold (magnitude)
     const double th = 0.001;
@@ -130,20 +130,23 @@ static Vec2 linreg(InputIt begin, InputIt end, double lambda = 0)
 
     std::cout << "Initial weight vector: " << weight << "\n";
 
+    // Mean-squared error
+    double mse;
+
     // Total number of iterations taken
     int iters = 0;
 
     // Gradient descent
     for (int t = 0; t < il; ++t)
     {
-        std::cout << "Iteration " << (iters = t + 1) << "\n";
-        std::cout << " -> Current weight vector: " << weight << "\n";
+        iters = t + 1;
+//      std::cout << "Iteration " << (iters = t + 1) << "\n";
+//      std::cout << " -> Current weight vector: " << weight << "\n";
 
         // The gradient vector
         Vec2 grad {};
 
-        // Mean-squared error
-        double mse = 0;
+        mse = 0;
 
         // Go over all points
         for (auto&& pt : range {begin, end})
@@ -155,23 +158,22 @@ static Vec2 linreg(InputIt begin, InputIt end, double lambda = 0)
             mse += std::pow(pt.y - weight.dot(feature), 2);
 
             // Update gradient vector
-            grad -= feature * (pt.y - weight.dot(feature));
+            grad += feature * (pt.y - weight.dot(feature)) * 2;
         }
 
         // Finalize MSE
         mse /= N;
 
-        std::cout << " -> Computed MSE: " << mse << "\n";
+//      std::cout << " -> Computed MSE: " << mse << "\n";
 
         // Finalize MSE component of gradient vector
         // We still need to do regularization with the penality term
-        grad *= (1.0 / N);
+        grad *= (-1.0 / N);
 
         // Add in L2 penalty term
-        grad.x += 2 * lambda * weight.x + lambda * weight.y * weight.y;
-        grad.y += lambda * weight.x * weight.x + 2 * lambda * weight.y;
+        grad += weight * 2 * lambda;
 
-        std::cout << " -> Computed gradient: " << grad << "\n";
+//      std::cout << " -> Computed gradient: " << grad << "\n";
 
         // If gradient is under threshold magnitude, we're done
         if (grad.dot(grad) <= th * th)
@@ -180,14 +182,21 @@ static Vec2 linreg(InputIt begin, InputIt end, double lambda = 0)
             break;
         }
 
+        if (iters == il)
+        {
+            std::cout << " -> !!! STOP: DID NOT CONVERGE\n";
+            break;
+        }
+
         // Update weight vector by gradient
         weight -= grad * lr;
 
-        std::cout << " -> New weight vector: " << weight << "\n";
+//      std::cout << " -> New weight vector: " << weight << "\n";
     }
 
     std::cout << "Concluding linear regression after " << iters << " iteration(s)\n";
     std::cout << "Final weight vector: " << weight << "\n";
+    std::cout << "Final MSE: " << mse << "\n";
 
     return weight;
 }
@@ -268,18 +277,15 @@ int main()
     std::system("pause");
 
     // Task 2
-    std::cout << "\nTASK 2 - RIDGE REGRESSION WITH GIVEN LAMBDAS\n";
+    std::cout << "\nTASK 2 - RIDGE REGRESSION WITH REGULARIZATION\n";
     std::cout << "--------------------------------------------------\n";
-    std::cout << "TODO\n";
-    // TODO
 
-    std::system("pause");
-
-    // Task 3
-    std::cout << "\nTASK 3 - RIDGE REGRESSION WITH 3-FOLD CV\n";
-    std::cout << "--------------------------------------------------\n";
-    std::cout << "TODO\n";
-    // TODO
+    for (auto lambda : std::array {0.1, 1.0, 10.0, 100.0})
+    {
+        std::cout << "Let lambda = " << lambda << "\n";
+        linreg(training.begin(), training.end(), lambda);
+        std::cout << "\n";
+    }
 
     return 0;
 }
