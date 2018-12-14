@@ -4,6 +4,7 @@
  * December 13, 2018
  */
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
@@ -11,6 +12,7 @@
 #include <iterator>
 #include <limits>
 #include <random>
+#include <utility>
 
 /**
  * A real-valued 2D vector.
@@ -103,9 +105,10 @@ struct range
  * @param begin An iterator to the first point
  * @param end An iterator one past the end of the last point
  * @param lambda The regularization constraint (optional, defaults to zero)
+ * @return A pair with the final weight vector and the final MSE
  */
 template<class InputIt>
-static Vec2 linreg(InputIt begin, InputIt end, double lambda = 0)
+static std::pair<Vec2, double> linreg(InputIt begin, InputIt end, double lambda = 0)
 {
     // GD iteration limit
     const int il = 1000000;
@@ -198,7 +201,7 @@ static Vec2 linreg(InputIt begin, InputIt end, double lambda = 0)
     std::cout << "Final weight vector: " << weight << "\n";
     std::cout << "Final MSE: " << mse << "\n";
 
-    return weight;
+    return {weight, mse};
 }
 
 int main()
@@ -257,34 +260,95 @@ int main()
 
     // Print out training set for reference
     std::cout << "TRAINING SET (n = " << training.size() << ")\n";
-    std::cout << "--------------------------------------------------\n";
+    std::cout << "-----------------------------------------------------------------\n";
+
     for (int i = 0; i < training.size(); ++i)
     {
         std::cout << (i + 1) << ". " << training[i] << "\n";
     }
 
-    std::system("pause");
-
     std::cout << "\nTASK 1 - LINEAR REGRESSION\n";
-    std::cout << "--------------------------------------------------\n";
+    std::cout << "-----------------------------------------------------------------\n";
+    std::system("pause");
 
     // Simply do linear regression on entire training set
     {
-        auto w = linreg(training.begin(), training.end());
+        auto [w, mse] = linreg(training.begin(), training.end());
         std::cout << "\nRegression line: y = " << w.y << " * x + " << w.x << "\n";
     }
 
-    std::system("pause");
-
     // Task 2
-    std::cout << "\nTASK 2 - RIDGE REGRESSION WITH REGULARIZATION\n";
-    std::cout << "--------------------------------------------------\n";
+    std::cout << "\nTASK 2 - RIDGE REGRESSION WITH REGULARIZATION AND 3-FOLD CV\n";
+    std::cout << "-----------------------------------------------------------------\n";
+    std::system("pause");
 
     for (auto lambda : std::array {0.1, 1.0, 10.0, 100.0})
     {
-        std::cout << "Let lambda = " << lambda << "\n";
-        linreg(training.begin(), training.end(), lambda);
-        std::cout << "\n";
+        std::cout << "\nLet lambda = " << lambda << "\n";
+
+        // Cross validation fold numbers
+        std::vector<int> folds {1, 2, 3};
+
+        // The MSE associated with this lambda
+        double lambda_mse = 0;
+
+        // The validation error associated with this lambda
+        double lambda_err = 0;
+
+        // Go over all permutations of three folds
+        // For each permutation, a regression will be performed over all but the last fold
+        // The last folds will be used for validations of the respective regressions
+        do
+        {
+            std::cout << "Performing one validated trial\n";
+            std::cout << " -> Fold order: " << folds[0] << ", " << folds[1] << ", " << folds[2] << " (using fold " << folds[2] << " for validation)\n";
+
+            // The sub-training and validation sets
+            // These each have the same type as the original training set
+            decltype(training) sub_train;
+            decltype(training) sub_valid;
+
+            // Iterate over number of folds
+            // Fill in the sub-training and validation sets
+            for (int i = 0; i < 3; ++i)
+            {
+                // Get desired fold number
+                int fold = folds[i];
+
+                // Iterate over points in this fold
+                for (int j = 0; j < training.size() / 3; ++j)
+                {
+                    // Get point with absolute (fold-invariant) index
+                    auto&& pt = training[i * 3 + j];
+
+                    // Add point to the fold
+                    switch (fold)
+                    {
+                    case 1:
+                    case 2:
+                        sub_train.push_back(pt);
+                        break;
+                    case 3:
+                        sub_valid.push_back(pt);
+                        break;
+                    }
+                }
+            }
+
+            // Perform weight decay linear regression with the current lambda value
+            auto [w, mse] = linreg(sub_train.begin(), sub_train.end(), lambda);
+
+            lambda_mse += mse;
+            lambda_err += 0;
+        }
+        while (std::next_permutation(folds.begin(), folds.end()));
+
+        lambda_mse /= 6; // 3!
+        lambda_err /= 6;
+
+        std::cout << "\nFor lambda = " << lambda << "\n";
+        std::cout << " -> Average in-sample error: " << lambda_mse << "\n";
+        std::cout << " -> Average validation error: " << lambda_err << "\n";
     }
 
     return 0;
