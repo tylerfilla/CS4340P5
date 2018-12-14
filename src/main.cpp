@@ -188,7 +188,7 @@ static std::pair<Vec2, double> linreg(InputIt begin, InputIt end, double lambda 
 //      std::cout << " -> Computed gradient: " << grad << "\n";
 
         // If gradient is under threshold magnitude, we're done
-        if (grad.dot(grad) <= th * th)
+        if (grad.dot(grad) <= std::pow(th, 2))
         {
             std::cout << " -> !!! STOP: GRADIENT MINIMIZED (mag. " << grad.mag() << " <= " << th << ")\n";
             break;
@@ -211,6 +211,39 @@ static std::pair<Vec2, double> linreg(InputIt begin, InputIt end, double lambda 
     std::cout << "Final MSE: " << mse << "\n";
 
     return {weight, mse};
+}
+
+/**
+ * Do validation over a set of points with a given model.
+ *
+ * @param begin An iterator to the first point
+ * @param end An iterator one past the end of the last point
+ * @param model The model under consideration
+ * @return A pair with the final weight vector and the final MSE
+ */
+template<class InputIt>
+static double validate(InputIt begin, InputIt end, const Vec2& model)
+{
+    // Count points
+    const auto N = std::distance(begin, end);
+
+    // Mean-squared error
+    double mse = 0;
+
+    // Go over all points
+    for (auto&& pt : range {begin, end})
+    {
+        // Feature vector
+        Vec2 feature {1, pt.x};
+
+        // Compute MSE term
+        mse = std::pow(pt.y - model.dot(feature), 2);
+    }
+
+    // Compute MSE
+    mse /= N;
+
+    return mse;
 }
 
 int main()
@@ -339,8 +372,8 @@ int main()
             lambda_weight += fold_weight;
             lambda_mse += fold_mse;
 
-            // TODO
-            lambda_valid += 0;
+            // Perform validation on the regression-producted weight vector
+            lambda_valid += validate(sub_valid.begin(), sub_valid.end(), fold_weight);
         }
 
         // Divide the accumulators
