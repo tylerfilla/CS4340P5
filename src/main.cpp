@@ -53,6 +53,15 @@ struct Vec2
     { return *this = *this * rhs; }
 
     /**
+     * Quotient (vector-scalar).
+     */
+    inline Vec2 operator/(double rhs) const
+    { return {x / rhs, y / rhs}; }
+
+    inline Vec2& operator/=(double rhs)
+    { return *this = *this / rhs; }
+
+    /**
      * Product (dot, vector-vector).
      */
     inline double dot(const Vec2& rhs) const
@@ -282,73 +291,68 @@ int main()
     std::cout << "-----------------------------------------------------------------\n";
     std::system("pause");
 
+    // Shuffle the training set
+    std::shuffle(training.begin(), training.end(), std::minstd_rand0 {});
+
     for (auto lambda : std::array {0.1, 1.0, 10.0, 100.0})
     {
         std::cout << "\nLet lambda = " << lambda << "\n";
 
-        // Cross validation fold numbers
-        std::vector<int> folds {1, 2, 3};
+        // The average weight vector for this lambda
+        Vec2 lambda_weight {};
 
-        // The MSE associated with this lambda
+        // The average MSE for this lambda
         double lambda_mse = 0;
 
-        // The validation error associated with this lambda
-        double lambda_err = 0;
+        // The average validation error for this lambda
+        double lambda_valid = 0;
 
-        // Go over all permutations of three folds
-        // For each permutation, a regression will be performed over all but the last fold
-        // The last folds will be used for validations of the respective regressions
-        do
+        // Fold parameters
+        // Only multiples of the training set size are supported right now
+        const auto folds = 3;
+        const auto per_fold = training.size() / folds;
+
+        // Iterate fold-by-fold
+        for (int fold = 0; fold < folds; ++fold)
         {
-            std::cout << "Performing one validated trial\n";
-            std::cout << " -> Fold order: " << folds[0] << ", " << folds[1] << ", " << folds[2] << " (using fold " << folds[2] << " for validation)\n";
+            // Inclusive-exclusive boundary indices
+            auto idx_begin = fold * per_fold;
+            auto idx_end = (fold + 1) * per_fold;
 
             // The sub-training and validation sets
             // These each have the same type as the original training set
-            decltype(training) sub_train;
-            decltype(training) sub_valid;
+            decltype(training) sub_train(per_fold * (folds - 1));
+            decltype(training) sub_valid(per_fold);
 
-            // Iterate over number of folds
-            // Fill in the sub-training and validation sets
-            for (int i = 0; i < 3; ++i)
-            {
-                // Get desired fold number
-                int fold = folds[i];
+            // Fill sub-training set
+            std::copy(training.begin(), training.begin() + idx_begin, sub_train.begin());
+            std::copy(training.begin() + idx_end, training.end(), sub_train.begin());
 
-                // Iterate over points in this fold
-                for (int j = 0; j < training.size() / 3; ++j)
-                {
-                    // Get point with absolute (fold-invariant) index
-                    auto&& pt = training[i * 3 + j];
+            // Fill sub-valid set
+            std::copy(training.begin() + idx_begin, training.begin() + idx_end, sub_valid.begin());
 
-                    // Add point to the fold
-                    switch (fold)
-                    {
-                    case 1:
-                    case 2:
-                        sub_train.push_back(pt);
-                        break;
-                    case 3:
-                        sub_valid.push_back(pt);
-                        break;
-                    }
-                }
-            }
+            // Do the regression for this fold configuration
+            auto [fold_weight, fold_mse] = linreg(sub_train.begin(), sub_train.end(), lambda);
 
-            // Perform weight decay linear regression with the current lambda value
-            auto [w, mse] = linreg(sub_train.begin(), sub_train.end(), lambda);
+            // Add weight and MSE to running totals
+            // We'll divide these down later
+            lambda_weight += fold_weight;
+            lambda_mse += fold_mse;
 
-            lambda_mse += mse;
-            lambda_err += 0;
+            // TODO
+            lambda_valid += 0;
         }
-        while (std::next_permutation(folds.begin(), folds.end()));
 
-        lambda_mse /= 6; // 3!
-        lambda_err /= 6;
+        // Divide the accumulators
+        // They are now averages as advertised
+        lambda_weight /= folds;
+        lambda_mse /= folds;
+        lambda_valid /= folds;
 
         std::cout << "\nFor lambda = " << lambda << "\n";
-        std::cout << " -> Average in-sample error: " << lambda_mse << "\n";
-        std::cout << " -> Average validation error: " << lambda_err << "\n";
+        std::cout << " -> Regression line: y = " << lambda_weight.y << " * x + " << lambda_weight.x << "\n";
+        std::cout << " -> In-sample error: " << lambda_mse << "\n";
+        std::cout << " -> Validation error: " << lambda_valid << "\n";
     }
 
     return 0;
