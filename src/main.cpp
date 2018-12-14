@@ -11,8 +11,9 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <random>
-#include <utility>
+#include <tuple>
 
 /**
  * A real-valued 2D vector.
@@ -327,6 +328,9 @@ int main()
     // Shuffle the training set
     std::shuffle(training.begin(), training.end(), std::minstd_rand0 {});
 
+    // The results map
+    std::map<double, std::tuple<double, Vec2, double>> results;
+
     for (auto lambda : std::array {0.1, 1.0, 10.0, 100.0})
     {
         std::cout << "\nLet lambda = " << lambda << "\n";
@@ -382,10 +386,28 @@ int main()
         lambda_mse /= folds;
         lambda_valid /= folds;
 
+        // Remember result as a tuple mapped to the validation error
+        results[lambda_valid] = std::make_tuple(lambda, lambda_weight, lambda_mse);
+
         std::cout << "\nFor lambda = " << lambda << "\n";
         std::cout << " -> Regression line: y = " << lambda_weight.y << " * x + " << lambda_weight.x << "\n";
         std::cout << " -> In-sample error: " << lambda_mse << "\n";
         std::cout << " -> Validation error: " << lambda_valid << "\n";
+    }
+
+    if (results.size() > 0)
+    {
+        std::cout << "\nA determination for lambda has been made\n";
+
+        auto&&[valid, data] = *results.begin();
+        auto&&[lambda, weight, mse] = data;
+
+        std::cout << " -> Lambda: " << lambda << "\n";
+        std::cout << " -> Validation error: " << valid << "\n";
+        std::cout << " -> MSE: " << mse << "\n";
+        std::cout << " -> Weight vector: " << weight << "\n";
+
+        std::cout << "\nRegularized regression line: y = " << weight.y << " * x + " << weight.x << "\n";
     }
 
     return 0;
